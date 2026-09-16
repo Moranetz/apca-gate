@@ -1,0 +1,8 @@
+{
+  "pairs": [
+    { "label": "body text on base surface",      "text": "#DEDEDE", "bg": "#121212", "require": 75 },
+    { "label": "secondary label on card",        "text": "#748fb4", "bg": "#1a1f2b", "require": 60 },
+    { "label": "body copy on card",              "text": "#cad4e2", "bg": "#1a1f2b", "require": 75 },
+    { "label": "accent ink on accent field",     "text": "#f0855a", "bg": "#2c1710", "require": 60 }
+  ]
+}
