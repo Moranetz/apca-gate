@@ -1,53 +1,99 @@
-# apca.py — a contrast gate that does not lie in the dark
+# apca.py, a contrast gate that does not lie in the dark
 
-WCAG 2's contrast ratio is a light-mode formula. On a dark interface it false-passes: text that clears 4.5:1, ships with a green tick, and is genuinely hard to read at night. APCA is the perceptual model headed into WCAG 3, and it catches what the ratio misses.
+[![tests](https://github.com/Moranetz/apca-gate/actions/workflows/test.yml/badge.svg)](https://github.com/Moranetz/apca-gate/actions/workflows/test.yml)
 
-This is one file, no dependencies, and it verifies itself before you trust a number from it.
+WCAG 2's contrast ratio overstates contrast between dark colours. On a dark interface it passes text that is hard to read at night. APCA is a perceptual contrast model developed as a candidate for WCAG 3, and it scores the same pair much lower.
+
+`apca.py` computes the APCA value (Lc) for a text colour on a background, prints the WCAG 2 ratio beside it, and exits 1 when a pair misses the level you required. It is one file with no dependencies and runs on Python 3.9 or later.
+
+## Run it
 
 ```
-python3 apca.py "#DEDEDE" "#121212" --require 75
-python3 apca.py --tokens tokens.example.json     # exits 1 on any failure, so it gates a build
-python3 apca.py --selftest                       # reproduces the published reference values
+python3 apca.py "#868686" "#1a1f2b" --require 60
 ```
 
-## What the false pass actually costs
+```
+#868686 on #1a1f2b
+  APCA    Lc -35.6  (light text on dark)
+  clears  Lc 30, absolute minimum for any text: placeholder, disabled and spot text only
+  WCAG 2  4.52:1  PASS at 4.5:1
+  ** DISAGREEMENT: passes WCAG 2 at 4.5:1, under the APCA minimum for content text (Lc 60).
+  gate    needs Lc 60 → FAIL
+```
 
-Measured with this script against a `#1a1f2b` ground:
+The first colour is the text and the second is the background. Lc is negative for light text on a dark ground, and the gate compares its magnitude.
 
-| WCAG 2 says | APCA says | Verdict |
-|---|---|---|
-| 4.47 : 1 ✅ passes | Lc 35 | fails even the decorative floor |
-| 6.04 : 1 ✅ passes | Lc 47 | decorative only |
-| 9.03 : 1 ✅ passes | Lc 67 | readable, still under the body-text minimum |
-| **11.0 : 1** | **Lc 78** | the first row that clears body text |
+To check a whole palette, declare the pairs in a JSON file and pass it with `--tokens`:
 
-On a dark ground you need roughly **11:1** to reach the body-text minimum. A dark screen shipped at "4.5:1, accessible ✓" sits near Lc 35, which is under the floor for text at any size.
+```
+python3 apca.py --tokens tokens.example.json
+```
+
+```json
+{
+  "pairs": [
+    { "label": "body text on base surface", "text": "#DEDEDE", "bg": "#121212", "require": 75 },
+    { "label": "secondary label on card",   "text": "#748fb4", "bg": "#1a1f2b", "require": 60 }
+  ]
+}
+```
+
+The example file ships with four pairs, and two of them fail on purpose, so the command above exits 1.
+
+| Exit code | Meaning |
+|---|---|
+| 0 | every pair with a `require` level cleared it |
+| 1 | at least one pair fell short |
+| 2 | the input could not be read: bad colour, bad token file, bad arguments |
+
+Colours are `#RGB` or `#RRGGBB`. Alpha is rejected, because the result would depend on what sits underneath.
+
+## What the false pass costs
+
+Greys on a `#1a1f2b` ground, with one light-mode row for comparison:
+
+| Text on ground | WCAG 2 | APCA | Reading |
+|---|---|---|---|
+| `#767676` on `#ffffff` | 4.54 : 1 | Lc 71.6 | passes AA on white, 3.4 short of the body-text minimum |
+| `#868686` on `#1a1f2b` | 4.52 : 1 | Lc -35.6 | passes AA, clears only the placeholder floor |
+| `#9c9c9c` on `#1a1f2b` | 6.00 : 1 | Lc -46.8 | passes AA, headline sizes only |
+| `#c0c0c0` on `#1a1f2b` | 9.05 : 1 | Lc -66.6 | passes AAA, still under the body-text minimum |
+| `#cfcfcf` on `#1a1f2b` | 10.57 : 1 | Lc -75.5 | the first grey that clears body text |
+
+The same 4.5:1 is worth Lc 72 on white and Lc 36 on this ground. Reaching Lc 75 with grey text takes 10.6:1 here, 11.7:1 on `#121212` and 12.9:1 on pure black.
 
 ## The ladder
 
+Levels and wording are condensed from the APCA use-case levels published by its author. Font sizes assume a Helvetica-like face.
+
 | Level | Use |
 |---|---|
-| Lc 90 | fluent body text, 14px/400 and up — the preferred level |
+| Lc 90 | preferred level for body text, 14px/400 and up |
 | Lc 75 | minimum for columns of body text at 18px/400 |
-| Lc 60 | minimum for content text you intend people to read |
-| Lc 45 | large or decorative text only |
-| below Lc 30 | the surface carries no text at all |
+| Lc 60 | minimum for content text you intend people to read, 24px/400 or 16px/700 |
+| Lc 45 | minimum for large headline text, 36px/400 or 24px/700 |
+| Lc 30 | absolute minimum for any text: placeholder, disabled and spot text only |
 
-## Why you should not take my word for it
+Under Lc 30 the script reports the pair as unusable for text at any size.
 
-Run `--selftest`. It computes four pairs whose APCA values are published, and prints computed against expected:
+## How it is verified
+
+The expected values come from `apca-w3` 0.1.9, the reference JavaScript package. None were produced by this script.
+
+- `python3 apca.py --selftest` computes ten pairs and compares them to the reference at a tolerance of 1e-9. Eight are the test vectors shipped in the package's own test file. It exits 1 on any mismatch.
+- `tests/reference_apca_w3_0.1.9.json` holds 512 pairs generated by running the package with `tools/gen_reference.mjs`: a grid of greys in both polarities, arbitrary colours, and near-black pairs where the soft clamp applies. The test suite requires this file to match on every pair.
+- CI runs the suite on Python 3.9, 3.11 and 3.13. A second job installs `apca-w3` from npm, regenerates the 512 values and fails if they differ from the committed file.
+- The numbers in the tables above are parsed out of this README by the tests and recomputed.
 
 ```
-PASS  #000000 on #FFFFFF   expected Lc  106.04   got Lc  106.04
-PASS  #FFFFFF on #000000   expected Lc -107.88   got Lc -107.88
-PASS  #888888 on #FFFFFF   expected Lc   63.06   got Lc   63.06
-PASS  #FFFFFF on #888888   expected Lc  -68.54   got Lc  -68.54
+python3 -m pip install pytest
+python3 -m pytest
 ```
-
-If those four do not reproduce, the tool tells you not to use it.
 
 ## Detail
 
-Implements APCA-W3 0.1.9 (`0.0.98G-4g-base-W3`), Andrew Somers / Myndex. Constants were checked against the SAPC-APCA specification and the `apca-w3` package documentation before this was written, rather than recalled. The script also reports the WCAG 2 ratio alongside the Lc value and flags the pairs where the two disagree, because the disagreement is the point.
+Implements APCA-W3 0.1.9 (`0.0.98G-4g-base-W3`) by Andrew Somers / Myndex, for sRGB hex colours. It does not implement the font size and weight lookup table, alpha blending, or the Display P3 and Adobe RGB inputs that `apca-w3` offers.
 
-APCA itself is licensed by its author for use with W3/AGWG guidelines; this is an independent implementation for checking your own tokens, not a certification tool.
+The disagreement flag is printed when a pair reaches 4.5:1 and stays under Lc 60.
+
+APCA is licensed by its author for use with W3/AGWG guidelines. This is an independent implementation for checking your own tokens, and a pass from it is no certification of conformance.
