@@ -5,8 +5,8 @@
 //   npm install --no-save apca-w3@0.1.9
 //   node tools/gen_reference.mjs > tests/reference_apca_w3_0.1.9.json
 //
-// The pair list is deterministic. CI reruns this and fails if the output
-// differs from the committed file.
+// The pair list is deterministic. CI reruns this and compares the output to
+// the committed file with tools/compare_reference.py.
 import { APCAcontrast, sRGBtoY } from 'apca-w3';
 
 const hex = (rgb) => '#' + rgb.map((v) => v.toString(16).padStart(2, '0')).join('');

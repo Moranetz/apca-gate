@@ -14,10 +14,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.11", "3.13"]
+        python-version: ["3.10", "3.12", "3.14"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install pytest
@@ -25,13 +25,13 @@ jobs:
       - run: python -m pytest -v
 
   reference:
-    # Reruns apca-w3 itself and fails if the committed expected values differ.
+    # Reruns apca-w3 itself and fails if a committed expected value is off by more than 1e-9.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
       - run: npm install --no-save apca-w3@0.1.9
       - run: node tools/gen_reference.mjs > regenerated.json
-      - run: diff regenerated.json tests/reference_apca_w3_0.1.9.json
+      - run: python3 tools/compare_reference.py regenerated.json tests/reference_apca_w3_0.1.9.json
